@@ -289,6 +289,7 @@ impl Output {
 
         let layout_size = Self::get_size(&self.get_window());
         let mut builder = DisplayListBuilder::new(pipeline_id);
+        builder.begin();
 
         if let Some((image_key, image_rect)) = image {
             let space_and_clip = SpaceAndClipInfo::root_scroll(pipeline_id);
