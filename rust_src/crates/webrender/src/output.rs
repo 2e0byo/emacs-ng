@@ -268,15 +268,13 @@ impl Output {
     }
 
     fn get_gl_api(gl_config: &Config) -> Rc<dyn Gl> {
-        match gl_config.api() {       // This match may need tweaking
-            // TODO replace window_context with valid call (and work out what this fn does---I think get a fn pointer)
-            Api::OPENGL => unsafe {
-                gl::GlFns::load_with(|symbol| gl_config.display().get_proc_address(&CString::new(symbol).unwrap()) as *const _)
-            },
-            Api::GLES1 | Api::GLES2 | Api::GLES3 => unsafe {
-                gl::GlesFns::load_with(|symbol| gl_config.display().get_proc_address(&CString::new(symbol).unwrap()) as *const _)
-            },
-            _ => unimplemented!(),
+        let flags = gl_config.api();
+        if flags.contains(Api::OPENGL) {
+            unsafe {gl::GlFns::load_with(|symbol| gl_config.display().get_proc_address(&CString::new(symbol).unwrap()) as *const _)}
+        } else if flags.intersects(Api::GLES1 | Api::GLES2 | Api::GLES3 ) {
+            unsafe {gl::GlesFns::load_with(|symbol| gl_config.display().get_proc_address(&CString::new(symbol).unwrap()) as *const _)}
+        } else {
+            unimplemented!();
         }
     }
 
