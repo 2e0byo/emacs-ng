@@ -154,8 +154,8 @@ impl Output {
         let gl_context =
             not_current_gl_context.take().unwrap().make_current(&gl_surface).unwrap();
 
-        // TODO is this needed?  We pass the size when we make the surface.
-        gl_surface.resize(&gl_context, NonZeroU32::new(width).unwrap(), NonZeroU32::new(height).unwrap());
+        // TODO is this needed?  We pass the size when we make the surface. -> apparently not.
+        // gl_surface.resize(&gl_context, NonZeroU32::new(width).unwrap(), NonZeroU32::new(height).unwrap());
 
 
         let gl = Self::get_gl_api(&gl_config);
