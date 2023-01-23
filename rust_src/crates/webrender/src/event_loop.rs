@@ -12,15 +12,17 @@ use copypasta::{
 };
 use futures::future::FutureExt;
 #[cfg(unix)]
-use glutin::platform::unix::EventLoopWindowTargetExtUnix;
-use glutin::{
+use winit::platform::unix::EventLoopWindowTargetExtUnix;
+use winit::{
     event::{Event, StartCause, WindowEvent},
-    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy, EventLoopBuilder},
     monitor::MonitorHandle,
     platform::run_return::EventLoopExtRunReturn,
-    window::{WindowBuilder, WindowId},
-    ContextBuilder, ContextCurrentState, CreationError, NotCurrent, WindowedContext,
+    window::WindowId,
 };
+use winit::window::Window;
+use glutin_winit::DisplayBuilder;
+use glutin::config::{Config, ConfigTemplateBuilder};
 use libc::{c_void, fd_set, pselect, sigset_t, timespec};
 use once_cell::sync::Lazy;
 use tokio::{io::unix::AsyncFd, runtime::Runtime, time::Duration};
@@ -51,12 +53,25 @@ unsafe impl Send for WrEventLoop {}
 unsafe impl Sync for WrEventLoop {}
 
 impl WrEventLoop {
-    pub fn build_window<'a, T: ContextCurrentState>(
+    pub fn build_window(
         &mut self,
-        window_builder: WindowBuilder,
-        context_builder: ContextBuilder<'a, T>,
-    ) -> Result<WindowedContext<NotCurrent>, CreationError> {
-        context_builder.build_windowed(window_builder, &self.el)
+        template_builder: ConfigTemplateBuilder,
+        display_builder: DisplayBuilder,
+        // config_picker: Picker,
+    ) -> (Option<Window>, Config) {
+        use glutin::config::GlConfig;
+        display_builder.build(&self.el, template_builder,
+                              |configs| {
+                                  configs
+                                      .reduce(|accum, config| {
+                                          if config.num_samples() > accum.num_samples() {
+                                              config
+                                          } else {
+                                              accum
+                                          }
+                                      })
+                                      .unwrap()
+                              }).unwrap()
     }
 
     pub fn create_proxy(&self) -> EventLoopProxy<i32> {
@@ -124,7 +139,7 @@ fn build_clipboard(event_loop: &EventLoop<i32>) -> Box<dyn ClipboardProvider> {
 }
 
 pub static EVENT_LOOP: Lazy<Mutex<WrEventLoop>> = Lazy::new(|| {
-    let el = glutin::event_loop::EventLoop::with_user_event();
+    let el = EventLoopBuilder::<i32>::with_user_event().build();
     let clipboard = build_clipboard(&el);
 
     Mutex::new(WrEventLoop { clipboard, el })
@@ -215,20 +230,20 @@ pub extern "C" fn wr_select(
 
     let nfds_result = RefCell::new(0);
 
-    // We mush run winit in main thread, because the macOS platfrom limitation.
+    // We must run winit in main thread, because the macOS platfrom limitation.
     event_loop.el.run_return(|e, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         match e {
             Event::WindowEvent { ref event, .. } => match event {
                 WindowEvent::Resized(_)
-                | WindowEvent::KeyboardInput { .. }
+                    | WindowEvent::KeyboardInput { .. }
                 | WindowEvent::ReceivedCharacter(_)
-                | WindowEvent::ModifiersChanged(_)
-                | WindowEvent::MouseInput { .. }
+                    | WindowEvent::ModifiersChanged(_)
+                    | WindowEvent::MouseInput { .. }
                 | WindowEvent::CursorMoved { .. }
                 | WindowEvent::Focused(_)
-                | WindowEvent::MouseWheel { .. }
+                    | WindowEvent::MouseWheel { .. }
                 | WindowEvent::CloseRequested => {
                     EVENT_BUFFER.lock().unwrap().push(e.to_static().unwrap());
 

@@ -2,7 +2,7 @@ use std::ptr;
 use std::{cmp::max, ffi::CString};
 
 use emacs::multibyte::LispStringRef;
-use glutin::{
+use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, Event, KeyboardInput, WindowEvent},
 };

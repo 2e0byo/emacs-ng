@@ -307,7 +307,7 @@ impl DrawCanvas {
                 .filter_map(|(n, glyph)| {
                     // TAB in a composition means display glyphs with padding
                     // space on the left or right.
-                    if s.composite_glyph(n as usize) == b'\t'.into() {
+                    if s.composite_glyph(n as usize) == <u8 as Into<i64>>::into(b'\t') {
                         return None;
                     }
 
@@ -468,7 +468,7 @@ impl DrawCanvas {
             if let Some(image) = &image {
                 let image_display_rect = LayoutRect::new(
                     pos,
-                    LayoutSize::new(image.width as f32, image.height as f32),
+                    LayoutPoint::new(pos.x + image.width as f32, pos.y + image.height as f32),
                 );
                 // render image
                 builder.push_image(

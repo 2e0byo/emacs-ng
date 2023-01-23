@@ -1,21 +1,25 @@
-use std::{cell::RefCell, mem::MaybeUninit, rc::Rc, sync::Arc};
+use std::{cell::RefCell, mem::MaybeUninit, rc::Rc, sync::Arc, num::NonZeroU32, ffi::CString};
 
 use gleam::gl::{self, Gl};
-use glutin::{
+use winit::{
     self,
     dpi::PhysicalSize,
-    window::{CursorIcon, Window},
-    ContextWrapper, PossiblyCurrent,
+    window::{CursorIcon, Window, WindowBuilder},
 };
+
+use glutin::{surface::{Surface, WindowSurface, SurfaceAttributesBuilder}, context::PossiblyCurrentContext};
+use glutin::prelude::GlSurface;
+use glutin::display::{GlDisplay, GetGlDisplay};
+use glutin::config::{Config, GlConfig, ColorBufferType};
+use glutin::context::{ContextApi, ContextAttributesBuilder, Version, NotCurrentGlContextSurfaceAccessor, PossiblyCurrentContextGlSurfaceAccessor};
+use glutin::config::{Api, ConfigTemplateBuilder};
+use glutin_winit::DisplayBuilder;
 use std::{
     ops::{Deref, DerefMut},
     ptr,
 };
 
-#[cfg(not(any(target_os = "macos", windows)))]
-use glutin::platform::unix::WindowBuilderExtUnix;
-
-use webrender::{self, api::units::*, api::*, RenderApi, Renderer, Transaction};
+use webrender::{self, api::units::*, api::*, RenderApi, Renderer, Transaction, create_webrender_instance};
 
 use emacs::{
     bindings::{wr_output, Emacs_Cursor},
@@ -59,14 +63,18 @@ pub struct Output {
     // Need to droppend before window context
     renderer: Renderer,
 
-    window_context: ContextWrapper<PossiblyCurrent, Window>,
+    window_context: PossiblyCurrentContext,
+    window: Window,
+    gl_config: Config,
+    surface: Surface<WindowSurface>,
 
     frame: LispFrameRef,
 }
 
 impl Output {
     pub fn build(event_loop: &mut WrEventLoop, frame: LispFrameRef) -> Self {
-        let window_builder = glutin::window::WindowBuilder::new()
+        // -- in glutin originally --
+        let window_builder = WindowBuilder::new()
             .with_visible(true)
             .with_maximized(true);
 
@@ -74,38 +82,101 @@ impl Output {
         let window_builder = {
             let invocation_name: LispStringRef = unsafe { globals.Vinvocation_name.into() };
             let invocation_name = invocation_name.to_utf8();
-            window_builder.with_app_id(invocation_name)
+            window_builder.with_title(invocation_name)
         };
 
-        let context_builder = glutin::ContextBuilder::new();
+        let template = ConfigTemplateBuilder::new(); // TODO do we need to do anything to this?
 
-        let window_context = event_loop
-            .build_window(window_builder, context_builder)
-            .unwrap();
+        let display_builder = DisplayBuilder::new().with_window_builder(Some(window_builder));
 
-        let window_id = window_context.window().id();
+        let (mut window, gl_config) = event_loop
+            .build_window(template, display_builder
+                          // ,
+                          // |configs| {
+                          //     configs
+                          //         .reduce(|accum, config| {
+                          //             if config.num_samples() > accum.num_samples() {
+                          //                 config
+                          //             } else {
+                          //                 accum
+                          //             }
+                          //         })
+                          //         .unwrap()
+                          // }
+            );
 
+        // from example
+        use raw_window_handle::HasRawWindowHandle;
+        let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
+        let gl_display = gl_config.display();
+
+        let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
+
+        // Since glutin by default tries to create OpenGL core context, which may not be
+        // present we should try gles.
+        let fallback_context_attributes = ContextAttributesBuilder::new()
+            .with_context_api(ContextApi::Gles(None))
+            .build(raw_window_handle);
+
+        // There are also some old devices that support neither modern OpenGL nor GLES.
+        // To support these we can try and create a 2.1 context.
+        let legacy_context_attributes = ContextAttributesBuilder::new()
+            .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
+            .build(raw_window_handle);
+
+        let mut not_current_gl_context = Some(unsafe {
+            gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(|_| {
+                gl_display.create_context(&gl_config, &fallback_context_attributes).unwrap_or_else(
+                    |_| {
+                        gl_display
+                            .create_context(&gl_config, &legacy_context_attributes)
+                            .expect("failed to create context")
+                    },
+                )
+            })
+        });
+
+        // I strongly suspect this all belongs on the event loop.  Are we in the same thread?
+        // wait for resize, as we may block when resizing.
+        let window = window.unwrap();
+        let raw_window_handle = window.raw_window_handle();
+        let window_id = window.id();
         event_loop.wait_for_window_resize(window_id);
+        let (width, height): (u32, u32) = window.inner_size().into();
+        let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
+            raw_window_handle,
+            NonZeroU32::new(width).unwrap(),
+            NonZeroU32::new(height).unwrap(),
+        );
+        let gl_surface = unsafe { gl_display.create_window_surface(&gl_config, &attrs).unwrap()};
 
-        let window_context = unsafe { window_context.make_current() }.unwrap();
+        // Make it current.
+        let gl_context =
+            not_current_gl_context.take().unwrap().make_current(&gl_surface).unwrap();
 
-        let window = window_context.window();
+        // TODO is this needed?  We pass the size when we make the surface.
+        gl_surface.resize(&gl_context, NonZeroU32::new(width).unwrap(), NonZeroU32::new(height).unwrap());
 
-        window_context.resize(window.inner_size());
 
-        let gl = Self::get_gl_api(&window_context);
+        let gl = Self::get_gl_api(&gl_config);
 
-        let webrender_opts = webrender::RendererOptions {
-            clear_color: None,
-            ..webrender::RendererOptions::default()
+        // -- into webrender --
+        let webrender_opts = webrender::WebRenderOptions {
+            // NOTE at one point we unset clear_color here, but that's no longer possible (not optional)
+            ..webrender::WebRenderOptions::default()
         };
 
         let notifier = Box::new(Notifier::new());
 
         let (mut renderer, sender) =
-            webrender::Renderer::new(gl.clone(), notifier, webrender_opts, None).unwrap();
+            create_webrender_instance(gl.clone(), notifier, webrender_opts, None).unwrap();
 
-        let color_bits = window_context.get_pixel_format().color_bits;
+        let color_buffer = gl_config.color_buffer_type().unwrap();
+        let color_bits = match color_buffer {
+            ColorBufferType::Rgb { r_size, g_size, b_size }=> r_size + g_size + b_size,
+            ColorBufferType::Luminance(_) => unimplemented!(),
+        };
+
 
         let texture_resources = Rc::new(RefCell::new(TextureResourceManager::new(
             gl.clone(),
@@ -121,8 +192,7 @@ impl Output {
         txn.set_root_pipeline(pipeline_id);
 
         let device_size = {
-            let size = window.inner_size();
-            DeviceIntSize::new(size.width as i32, size.height as i32)
+            DeviceIntSize::new(width as i32, height as i32)
         };
 
         let mut api = sender.create_api();
@@ -143,7 +213,10 @@ impl Output {
             cursor_foreground_color: ColorF::WHITE,
             color_bits,
             renderer,
-            window_context,
+            window: window,
+            window_context: gl_context,
+            gl_config,
+            surface: gl_surface,
             texture_resources,
             frame,
         };
@@ -175,7 +248,7 @@ impl Output {
             need_flip,
         );
 
-        let gl = Self::get_gl_api(&self.window_context);
+        let gl = Self::get_gl_api(&self.gl_config);
         gl.bind_texture(gl::TEXTURE_2D, texture_id);
 
         gl.copy_tex_sub_image_2d(
@@ -194,15 +267,16 @@ impl Output {
         image_key
     }
 
-    fn get_gl_api(window_context: &ContextWrapper<PossiblyCurrent, Window>) -> Rc<dyn Gl> {
-        match window_context.get_api() {
-            glutin::Api::OpenGl => unsafe {
-                gl::GlFns::load_with(|symbol| window_context.get_proc_address(symbol) as *const _)
+    fn get_gl_api(gl_config: &Config) -> Rc<dyn Gl> {
+        match gl_config.api() {       // This match may need tweaking
+            // TODO replace window_context with valid call (and work out what this fn does---I think get a fn pointer)
+            Api::OPENGL => unsafe {
+                gl::GlFns::load_with(|symbol| gl_config.display().get_proc_address(&CString::new(symbol).unwrap()) as *const _)
             },
-            glutin::Api::OpenGlEs => unsafe {
-                gl::GlesFns::load_with(|symbol| window_context.get_proc_address(symbol) as *const _)
+            Api::GLES1 | Api::GLES2 | Api::GLES3 => unsafe {
+                gl::GlesFns::load_with(|symbol| gl_config.display().get_proc_address(&CString::new(symbol).unwrap()) as *const _)
             },
-            glutin::Api::WebGl => unimplemented!(),
+            _ => unimplemented!(),
         }
     }
 
@@ -296,27 +370,29 @@ impl Output {
     }
 
     fn ensure_context_is_current(&mut self) {
-        let window_context = std::mem::replace(&mut self.window_context, unsafe {
-            MaybeUninit::uninit().assume_init()
-        });
-        let window_context = unsafe { window_context.make_current() }.unwrap();
+        // let window_context = std::mem::replace(&mut self.window_context, unsafe {
+        //     MaybeUninit::uninit().assume_init()
+        // });
+        // window_context.make_current(&self.surface);
+        // // let window_context = window_context.make_current(&self.surface);
 
-        let temp_context = std::mem::replace(&mut self.window_context, window_context);
-        std::mem::forget(temp_context);
+        // let temp_context = std::mem::replace(&mut self.window_context, window_context);
+        // std::mem::forget(temp_context);
+        self.window_context.make_current(&self.surface);
     }
 
     pub fn flush(&mut self) {
         let builder = std::mem::replace(&mut self.display_list_builder, None);
 
-        if let Some(builder) = builder {
+        if let Some(mut builder) = builder {
             let layout_size = Self::get_size(&self.get_window());
 
             let epoch = Epoch(0);
             let mut txn = Transaction::new();
 
-            txn.set_display_list(epoch, None, layout_size.to_f32(), builder.finalize(), true);
+            txn.set_display_list(epoch, None, layout_size.to_f32(), builder.end());
 
-            txn.generate_frame(0);
+            txn.generate_frame(0, RenderReasons::empty());
 
             self.render_api.send_transaction(self.document_id, txn);
 
@@ -331,7 +407,7 @@ impl Output {
             self.renderer.render(device_size, 0).unwrap();
             let _ = self.renderer.flush_pipeline_info();
 
-            self.window_context.swap_buffers().ok();
+            self.surface.swap_buffers(&self.window_context).ok();
 
             self.texture_resources.borrow_mut().clear();
 
@@ -383,7 +459,7 @@ impl Output {
     }
 
     pub fn get_window(&self) -> &Window {
-        self.window_context.window()
+        &self.window
     }
 
     fn build_mouse_cursors(output: &mut Output) {
@@ -463,8 +539,7 @@ impl Output {
         let mut txn = Transaction::new();
         txn.set_document_view(device_rect);
         self.render_api.send_transaction(self.document_id, txn);
-
-        self.window_context.resize(size.clone());
+        self.surface.resize(&self.window_context, NonZeroU32::new(size.width).unwrap(), NonZeroU32::new(size.height).unwrap());
     }
 }
 
@@ -534,7 +609,6 @@ impl RenderNotifier for Notifier {
         _: DocumentId,
         _scrolled: bool,
         _composite_needed: bool,
-        _render_time: Option<u64>,
     ) {
     }
 }

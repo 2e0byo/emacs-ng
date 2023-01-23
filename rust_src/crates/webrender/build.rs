@@ -17,17 +17,18 @@ fn generate_webrender_revision() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let revision_file_path = Path::new(&out_dir).join("webrender_revision.rs");
     let manifest = Manifest::from_slice(&read("Cargo.toml").unwrap()).unwrap();
-    let webrender_head_rev = {
-        if !manifest.dependencies.contains_key(WEBRENDER_DEP_NAME) {
-            "unknown"
-        } else {
-            let webrender_dep = &manifest.dependencies[WEBRENDER_DEP_NAME];
-            match webrender_dep {
-                Dependency::Detailed(detail) => detail.rev.as_ref().unwrap(),
-                Dependency::Simple(version) => version,
-            }
-        }
-    };
+    let webrender_head_rev = "unknown";
+//    {
+//        if !manifest.dependencies.contains_key(WEBRENDER_DEP_NAME) {
+//            "unknown"
+//        } else {
+//            let webrender_dep = &manifest.dependencies[WEBRENDER_DEP_NAME];
+//            match webrender_dep {
+//                Dependency::Detailed(detail) => detail.rev.as_ref().unwrap(),
+//                Dependency::Simple(version) => version,
+//            }
+//        }
+//    };
 
     let mut revision_file = fs::File::create(&revision_file_path).unwrap();
 
