@@ -1,0 +1,20 @@
+- The old glutin api used Contexts
+- The new glutin api abstracts a lot of the GL Context into a (higher-level)
+  Surface.  It still provides the underlying context, *but* some of the
+  windowing stuff is gone (you have to call e.g. `winit` directly.
+
+-> We should also move to the `Surface` api wherever possible.
+
+Currently in `output.rs` context is used:
+
+ - in `ensure_context_is_current` :: replace
+* developing
+Clone the emacs-ng repo, and then run `./autogen.sh` and `./compile
+--with-webrender --without-javascript`.
+
+This builds and configures everything it can.
+
+Then run cargo from the *root* crate, i.e. `cd rust_src && cargo build`.
+
+Since we're working against a new version of webrender which hasn't been
+published yet, clone the repo and run `cargo doc`.  The documentation is then in `target/doc/webrender`.
