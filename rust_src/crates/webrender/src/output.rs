@@ -3,7 +3,7 @@ use std::{cell::RefCell, mem::MaybeUninit, rc::Rc, sync::Arc, num::NonZeroU32, f
 use gleam::gl::{self, Gl};
 use winit::{
     self,
-    dpi::PhysicalSize,
+    dpi::{PhysicalSize, LogicalSize},
     window::{CursorIcon, Window, WindowBuilder},
 };
 
@@ -76,7 +76,8 @@ impl Output {
         // -- in glutin originally --
         let window_builder = WindowBuilder::new()
             .with_visible(true)
-            .with_maximized(true);
+            .with_maximized(true)
+            .with_inner_size(LogicalSize::new(1920.0,1080.0));
 
         #[cfg(all(feature = "wayland", not(any(target_os = "macos", windows))))]
         let window_builder = {
