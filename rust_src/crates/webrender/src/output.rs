@@ -366,7 +366,7 @@ impl Output {
             let epoch = Epoch(0);
             let mut txn = Transaction::new();
 
-            txn.set_display_list(epoch, None, layout_size.to_f32(), builder.end());
+            txn.set_display_list(epoch, None, layout_size, builder.end());
 
             txn.generate_frame(0, RenderReasons::empty());
 
