@@ -126,11 +126,8 @@ impl Output {
         });
 
         // I strongly suspect this all belongs on the event loop.  Are we in the same thread?
-        // wait for resize, as we may block when resizing.
         let window = window.unwrap();
         let raw_window_handle = window.raw_window_handle();
-        let window_id = window.id();
-        event_loop.wait_for_window_resize(window_id);
         let (width, height): (u32, u32) = window.inner_size().into();
         let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
             raw_window_handle,
