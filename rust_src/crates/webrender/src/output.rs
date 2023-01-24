@@ -260,6 +260,10 @@ impl Output {
         }
     }
 
+    fn get_scaled_size(&self) -> LayoutSize {
+        self.get_device_size().to_f32() / euclid::Scale::new(self.get_window().scale_factor() as f32)
+    }
+
     fn get_unscaled_size(&self) -> LayoutSize {
         let dims = self.get_device_size().to_f32();
         LayoutSize::new(dims.width, dims.height)
