@@ -264,16 +264,15 @@ impl Output {
         }
     }
 
-    fn get_size(window: &Window) -> LayoutSize {
-        let physical_size = window.inner_size();
-        let device_size = LayoutSize::new(physical_size.width as f32, physical_size.height as f32);
-        device_size
+    fn get_unscaled_size(&self) -> LayoutSize {
+        let dims = self.get_device_size().to_f32();
+        LayoutSize::new(dims.width, dims.height)
     }
 
     fn new_builder(&mut self, image: Option<(ImageKey, LayoutRect)>) -> DisplayListBuilder {
         let pipeline_id = PipelineId(0, 0);
 
-        let layout_size = Self::get_size(&self.get_window());
+        let layout_size = self.get_unscaled_size();
         let mut builder = DisplayListBuilder::new(pipeline_id);
         builder.begin();
 
@@ -336,7 +335,7 @@ impl Output {
         F: Fn(&mut DisplayListBuilder, SpaceAndClipInfo),
     {
         if self.display_list_builder.is_none() {
-            let layout_size = Self::get_size(&self.get_window());
+            let layout_size = self.get_unscaled_size();
 
             let image_and_pos = self
                 .previous_frame_image
@@ -362,7 +361,7 @@ impl Output {
         let builder = std::mem::replace(&mut self.display_list_builder, None);
 
         if let Some(mut builder) = builder {
-            let layout_size = Self::get_size(&self.get_window());
+            let layout_size = self.get_unscaled_size();
 
             let epoch = Epoch(0);
             let mut txn = Transaction::new();
