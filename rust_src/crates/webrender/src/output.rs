@@ -321,6 +321,10 @@ impl Output {
         self.get_window().inner_size()
     }
 
+    pub fn device_pixel_ratio(&self) -> f32 {
+        self.get_window().scale_factor() as f32
+    }
+
     fn get_device_size(&self) -> DeviceIntSize {
         let size = self.get_window().inner_size();
         DeviceIntSize::new(size.width as i32, size.height as i32)
