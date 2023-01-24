@@ -230,7 +230,7 @@ impl Output {
     fn copy_framebuffer_to_texture(&self, device_rect: DeviceIntRect) -> ImageKey {
         let mut origin = device_rect.min;
 
-        let device_size = self.get_deivce_size();
+        let device_size = self.get_device_size();
 
         if !self.renderer.device.surface_origin_is_top_left() {
             origin.y = device_size.height - origin.y - device_rect.height();
@@ -341,7 +341,7 @@ impl Output {
         self.get_window().inner_size()
     }
 
-    fn get_deivce_size(&self) -> DeviceIntSize {
+    fn get_device_size(&self) -> DeviceIntSize {
         let size = self.get_window().inner_size();
         DeviceIntSize::new(size.width as i32, size.height as i32)
     }
@@ -398,7 +398,7 @@ impl Output {
 
             self.render_api.flush_scene_builder();
 
-            let device_size = self.get_deivce_size();
+            let device_size = self.get_device_size();
 
             self.renderer.update();
 
