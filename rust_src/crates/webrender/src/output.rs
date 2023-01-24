@@ -370,15 +370,7 @@ impl Output {
     }
 
     fn ensure_context_is_current(&mut self) {
-        // let window_context = std::mem::replace(&mut self.window_context, unsafe {
-        //     MaybeUninit::uninit().assume_init()
-        // });
-        // window_context.make_current(&self.surface);
-        // // let window_context = window_context.make_current(&self.surface);
-
-        // let temp_context = std::mem::replace(&mut self.window_context, window_context);
-        // std::mem::forget(temp_context);
-        self.window_context.make_current(&self.surface);
+        self.window_context.make_current(&self.surface).unwrap();
     }
 
     pub fn flush(&mut self) {
