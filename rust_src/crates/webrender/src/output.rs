@@ -90,20 +90,8 @@ impl Output {
 
         let display_builder = DisplayBuilder::new().with_window_builder(Some(window_builder));
 
-        let (mut window, gl_config) = event_loop
+        let (window, gl_config) = event_loop
             .build_window(template, display_builder
-                          // ,
-                          // |configs| {
-                          //     configs
-                          //         .reduce(|accum, config| {
-                          //             if config.num_samples() > accum.num_samples() {
-                          //                 config
-                          //             } else {
-                          //                 accum
-                          //             }
-                          //         })
-                          //         .unwrap()
-                          // }
             );
 
         // from example
