@@ -322,7 +322,8 @@ impl Output {
     }
 
     pub fn device_pixel_ratio(&self) -> f32 {
-        self.get_window().scale_factor() as f32
+        // self.get_window().scale_factor() as f32
+        1. as f32
     }
 
     fn get_device_size(&self) -> DeviceIntSize {
@@ -336,6 +337,7 @@ impl Output {
     {
         if self.display_list_builder.is_none() {
             let layout_size = self.get_size();
+            println!("display layout size:{:?}", layout_size);
 
             let image_and_pos = self
                 .previous_frame_image
@@ -362,6 +364,7 @@ impl Output {
 
         if let Some(mut builder) = builder {
             let layout_size = self.get_size();
+            println!("flush layout size:{:?}", layout_size);
 
             let epoch = Epoch(0);
             let mut txn = Transaction::new();
@@ -400,7 +403,7 @@ impl Output {
         let _ = std::mem::replace(&mut self.display_list_builder, None);
     }
 
-    pub fn add_font_instance(&mut self, font_key: FontKey, pixel_size: i32) -> FontInstanceKey {
+    pub fn add_font_instance(&mut self, font_key: FontKey, pixel_size: f32) -> FontInstanceKey {
         let mut txn = Transaction::new();
 
         let font_instance_key = self.render_api.generate_font_instance_key();
@@ -408,7 +411,7 @@ impl Output {
         txn.add_font_instance(
             font_instance_key,
             font_key,
-            pixel_size as f32,
+            pixel_size,
             None,
             None,
             vec![],
@@ -507,6 +510,8 @@ impl Output {
     }
 
     pub fn resize(&mut self, size: &PhysicalSize<u32>) {
+        println!("resizing: {:?}", size);
+        println!("Surface {:?} ({:?}z{:?})", self.surface, self.surface.width(), self.surface.height());
         let device_size = DeviceIntSize::new(size.width as i32, size.height as i32);
 
         let device_rect =
@@ -516,6 +521,7 @@ impl Output {
         txn.set_document_view(device_rect);
         self.render_api.send_transaction(self.document_id, txn);
         self.surface.resize(&self.window_context, NonZeroU32::new(size.width).unwrap(), NonZeroU32::new(size.height).unwrap());
+        println!("Surface {:?} ({:?}z{:?})", self.surface, self.surface.width(), self.surface.height());
     }
 }
 

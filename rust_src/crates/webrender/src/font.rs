@@ -361,7 +361,7 @@ extern "C" fn open_font(frame: *mut frame, font_entity: LispObject, pixel_size: 
 
     // Create font key in webrender.
     let font_key = output.add_font(font_bytes.clone(), face_index);
-    wr_font.font_instance_key = output.add_font_instance(font_key, pixel_size as i32);
+    wr_font.font_instance_key = output.add_font_instance(font_key, pixel_size as f32);
 
     wr_font.font_bytes = ManuallyDrop::new(font_bytes.clone());
 
