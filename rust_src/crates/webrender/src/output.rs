@@ -322,8 +322,8 @@ impl Output {
     }
 
     pub fn device_pixel_ratio(&self) -> f32 {
-        // self.get_window().scale_factor() as f32
-        1. as f32
+            println!("Scale factor is: {:?}.  Global scale factor is 1.5.  Not sure where it got that.", self.get_window().scale_factor());
+        1.75 as f32
     }
 
     fn get_device_size(&self) -> DeviceIntSize {
@@ -337,7 +337,6 @@ impl Output {
     {
         if self.display_list_builder.is_none() {
             let layout_size = self.get_size();
-            println!("display layout size:{:?}", layout_size);
 
             let image_and_pos = self
                 .previous_frame_image
