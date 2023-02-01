@@ -582,6 +582,7 @@ pub fn x_display_visual_class(_terminal: LispObject) -> LispObject {
 
 pub fn webrender_monitor_to_emacs_monitor(m: MonitorHandle) -> (MonitorInfo, Option<CString>) {
     let dpi_factor = m.scale_factor();
+    println!("dpi factor is: {:?}", dpi_factor);
 
     let physical_pos = m.position();
     let physical_size = m.size();

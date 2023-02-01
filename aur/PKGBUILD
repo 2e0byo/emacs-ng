@@ -1,0 +1,62 @@
+# Contributor: Sainnhe Park <sainnhe@gmail.com>
+# Maintainer: Stefan Husmann <stefan-husmann@t-online.de>
+
+pkgname=emacs-ng
+pkgver=28.1.50
+_fix_commit=d5c8bdf
+pkgrel=4
+pkgdesc="A new approach to Emacs - Including TypeScript, Threading, Async I/O, and WebRender"
+arch=('x86_64')
+url="https://emacs-ng.github.io/emacs-ng"
+license=('GPL3')
+provides=('emacs')
+conflicts=('emacs')
+depends=('jansson' 'ncurses' 'libgccjit' 'librsvg' 'libxpm' 'libjpeg-turbo' 'libtiff'
+	 'giflib' 'libpng' 'harfbuzz' 'libxcb' 'libxml2' 'gpm' 'dune' 'dbus' 'lcms2'
+	 'hicolor-icon-theme' 'desktop-file-utils' 'alsa-lib' 'gnutls' 'cairo' 'zlib'
+         'imagemagick'
+	 )
+makedepends=('rustup' 'python' 'texlive-core')
+options=(debug !strip)
+# source=("git+file:///home/john/src/emacs-ng/")
+# sha256sums=('skip')
+
+# prepare() {
+#     cd ${pkgname}-0.0.${_fix_commit}
+#     rustup install "$(cat rust-toolchain)"
+# }
+
+build() {
+    # cd ${pkgname}-0.0.${_fix_commit}
+    cd ../../
+    RUSTUP_TOOLCHAIN=$(cat rust-toolchain)
+    ./autogen.sh
+    CFLAGS="-Wl,-rpath,shared -Wl,--disable-new-dtags -lMagickWand-7.Q16HDRI -lMagickCore-7.Q16HDRI " \
+    ./configure\
+        --prefix=/usr --sysconfdir=/etc --libexecdir=/usr/lib --localstatedir=/var \
+        --with-webrender --without-javascript --with-xpm \
+        --with-json --with-modules --with-harfbuzz --with-compress-install \
+        --with-threads --with-included-regex --with-zlib --with-cairo --with-libsystemd \
+        --with-rsvg --without-sound \
+	--with-imagemagick --with-gpm --with-dbus --without-pop --without-mailutils \
+	--without-gsettings --with-all --disable-build-details --without-javascript
+
+    echo -e "\n\n%txt:\n\techo 'hi'" >> src/Makefile
+
+    make || make
+         # PATH="$HOME/.rustup/toolchains/${RUSTUP_TOOLCHAIN}-$(uname -m)-unknown-linux-gnu/bin:$PATH"
+    # make pdf
+}
+
+package() {
+    cd ../../
+    pwd
+    make DESTDIR="$pkgdir" install
+
+    # remove conflict with ctags package
+    mv "$pkgdir"/usr/bin/{ctags,ctags.emacs}
+    mv "$pkgdir"/usr/share/man/man1/{ctags.1.gz,ctags.emacs.1}
+
+    # fix user/root permissions on usr/share files
+    find "$pkgdir"/usr/share/emacs/$pkgver -exec chown root:root {} \;
+}

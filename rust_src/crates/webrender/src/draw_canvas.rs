@@ -225,6 +225,13 @@ impl DrawCanvas {
     }
 
     fn draw_image_glyph(&mut self, mut s: GlyphStringRef) {
+        let wr_pixmap = unsafe { (*s.img).pixmap } as *mut WrPixmap;
+
+        // TODO handle null pixmap, (apparently 0x0)?
+        if wr_pixmap.is_null() {
+            return;
+        }
+
         let mut clip_rect = Emacs_Rectangle {
             x: 0,
             y: 0,
@@ -233,6 +240,11 @@ impl DrawCanvas {
         };
 
         unsafe { get_glyph_string_clip_rect(s.as_mut(), &mut clip_rect) };
+
+        println!(
+            "Drawing image glyph {:?} of dimensions {:?}",
+            wr_pixmap, clip_rect
+        );
 
         let clip_bounds =
             (clip_rect.x, clip_rect.y).by(clip_rect.width as i32, clip_rect.height as i32);
@@ -254,21 +266,17 @@ impl DrawCanvas {
                 );
             }
 
-            let wr_pixmap = unsafe { (*s.img).pixmap } as *mut WrPixmap;
+            let image_key = unsafe { (*wr_pixmap).image_key };
 
-            if !wr_pixmap.is_null() {
-                let image_key = unsafe { (*wr_pixmap).image_key };
-
-                // render image
-                builder.push_image(
-                    &CommonItemProperties::new(clip_bounds, space_and_clip),
-                    bounds,
-                    ImageRendering::Auto,
-                    AlphaType::Alpha,
-                    image_key,
-                    ColorF::WHITE,
-                );
-            }
+            // render image
+            builder.push_image(
+                &CommonItemProperties::new(clip_bounds, space_and_clip),
+                bounds,
+                ImageRendering::Auto,
+                AlphaType::Alpha,
+                image_key,
+                ColorF::WHITE,
+            );
         });
     }
 
