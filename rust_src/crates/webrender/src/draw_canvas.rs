@@ -280,6 +280,10 @@ impl DrawCanvas {
         });
     }
 
+    fn automatic_composition(s: GlyphStringRef) -> bool {
+        unsafe { (*s.first_glyph).u.cmp.automatic() }
+    }
+
     fn draw_composite_glyph_string(&mut self, s: GlyphStringRef) {
         // S is a glyph string for a composition.  S->cmp_from is the index
         // of the first character drawn for glyphs of this composition.
@@ -292,7 +296,7 @@ impl DrawCanvas {
             if s.cmp_from == 0 {
                 self.clear_area(self.output.cursor_color, s.x, s.y, s.width, s.height);
             }
-        } else if !unsafe { (*s.first_glyph).u.cmp.automatic() } {
+        } else if !Self::automatic_composition(s) {
             let font = WRFontRef::new(s.font as *mut WRFont);
 
             let x = if !s.face.is_null()
