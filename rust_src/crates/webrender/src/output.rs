@@ -508,6 +508,7 @@ impl Output {
     }
 
     pub fn resize(&mut self, size: &PhysicalSize<u32>) {
+        println!("In Output::resize()");
         let device_size = DeviceIntSize::new(size.width as i32, size.height as i32);
 
         let device_rect =
