@@ -913,7 +913,7 @@ pub fn wr_api_capture(path: LispStringRef, bits_raw: LispObject, start_sequence:
 #[lisp_fn(min = "0")]
 pub fn wr_api_stop_capture_sequence() {
     #[cfg(not(feature = "capture"))]
-    error!("Webrender capture not avaiable");
+    error!("Webrender capture not available");
     #[cfg(feature = "capture")]
     {
         message!("Stop capturing WR state");
