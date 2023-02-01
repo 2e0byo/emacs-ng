@@ -20,7 +20,6 @@ ng_async = { version = "0.1.0", path = "crates/ng_async" }
 lsp_json = { version = "0.1.0", path = "crates/lsp_json" }
 git = { version = "0.1.0", path = "crates/git", optional = true }
 ng_module = { version = "0.1.0", path = "crates/ng_module", optional = true }
-js = { version = "0.1.0", path = "crates/js", optional = true }
 webrender = { version = "0.1.0", path = "crates/webrender", optional = true }
 clippy = { version = "*", optional = true }
 
@@ -73,8 +72,6 @@ libgit = ["git"]
 window-system-webrender = [@WEBRENDER_DEFAULT_FEATURES@]
 # Treat warnings as a build error on Travis.
 strict = []
-# Use JavaScript and Deno
-javascript = ["js"]
 # Build with dynamic modules support's extensions.
 ng-module = ["ng_module"]
 # Enable glyphs debugging code.

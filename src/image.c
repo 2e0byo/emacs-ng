@@ -10889,7 +10889,7 @@ non-numeric, there is no explicit limit on the size of images.  */);
   DEFSYM (Qxbm, "xbm");
   add_image_type (Qxbm);
 
-#if defined (HAVE_XPM) || defined (HAVE_NS)
+#if defined (HAVE_XPM) || defined (HAVE_NS) || defined (HAVE_NATIVE_IMAGE_API)
   DEFSYM (Qxpm, "xpm");
   add_image_type (Qxpm);
 #endif
