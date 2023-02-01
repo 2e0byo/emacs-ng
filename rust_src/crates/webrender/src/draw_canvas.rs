@@ -284,16 +284,20 @@ impl DrawCanvas {
         unsafe { (*s.first_glyph).u.cmp.automatic() }
     }
 
+    // S is a glyph string for a composition.  S->cmp_from is the index
+    // of the first character drawn for glyphs of this composition.
+    // S->cmp_from == 0 means we are drawing the very first character of
+    // this composition
+    fn on_first_char(s: GlyphStringRef) -> bool {
+        s.cmp_from == 0
+    }
+
     fn draw_composite_glyph_string(&mut self, s: GlyphStringRef) {
-        // S is a glyph string for a composition.  S->cmp_from is the index
-        // of the first character drawn for glyphs of this composition.
-        // S->cmp_from == 0 means we are drawing the very first character of
-        // this composition
 
         // Draw a rectangle for the composition if the font for the very
         // first character of the composition could not be loaded.
         if s.font_not_found_p() {
-            if s.cmp_from == 0 {
+            if Self::on_first_char(s) {
                 self.clear_area(self.output.cursor_color, s.x, s.y, s.width, s.height);
             }
         } else if !Self::automatic_composition(s) {
