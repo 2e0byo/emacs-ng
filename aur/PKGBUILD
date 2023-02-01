@@ -39,7 +39,8 @@ build() {
         --with-threads --with-included-regex --with-zlib --with-cairo --with-libsystemd \
         --with-rsvg --without-sound \
 	--with-imagemagick --with-gpm --with-dbus --without-pop --without-mailutils \
-	--without-gsettings --with-all --disable-build-details --without-javascript
+	--without-gsettings --with-all --disable-build-details --without-javascript \
+	--with-native-compilation=aot
 
     echo -e "\n\n%txt:\n\techo 'hi'" >> src/Makefile
 
