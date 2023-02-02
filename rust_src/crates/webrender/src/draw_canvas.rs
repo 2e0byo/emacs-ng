@@ -40,14 +40,14 @@ impl DrawCanvas {
 
         match s.hl {
             draw_glyphs_face::DRAW_NORMAL_TEXT
-            | draw_glyphs_face::DRAW_INVERSE_VIDEO
-            | draw_glyphs_face::DRAW_MOUSE_FACE
-            | draw_glyphs_face::DRAW_IMAGE_RAISED
-            | draw_glyphs_face::DRAW_IMAGE_SUNKEN => {
-                let face = unsafe { &*s.face };
-                s.gc = face.gc;
-                s.set_stippled_p(face.stipple != 0);
-            }
+                | draw_glyphs_face::DRAW_INVERSE_VIDEO
+                | draw_glyphs_face::DRAW_MOUSE_FACE
+                | draw_glyphs_face::DRAW_IMAGE_RAISED
+                | draw_glyphs_face::DRAW_IMAGE_SUNKEN => {
+                    let face = unsafe { &*s.face };
+                    s.gc = face.gc;
+                    s.set_stippled_p(face.stipple != 0);
+                }
 
             draw_glyphs_face::DRAW_CURSOR => {
                 let face = unsafe { &*s.face };
@@ -302,47 +302,47 @@ impl DrawCanvas {
             }
         } else {
             let font = WRFontRef::new(s.font as *mut WRFont);
-            let glyph_instances: Vec<GlyphInstance> =
-                if !Self::automatic_composition(s) {
-                    let x = if !s.face.is_null()
-                        && unsafe { (*s.face).box_() } != FACE_NO_BOX
-                        && unsafe { (*s.first_glyph).left_box_line_p() }
-                    {
-                        s.x + std::cmp::max(unsafe { (*s.face).box_vertical_line_width }, 0)
-                    } else {
-                        s.x
+            if Self::automatic_composition(s) {
+                println!("Just not displaying auto composition");
+                return;
+            }
+
+            let x = if !s.face.is_null()
+                && unsafe { (*s.face).box_() } != FACE_NO_BOX
+                && unsafe { (*s.first_glyph).left_box_line_p() }
+            {
+                s.x + std::cmp::max(unsafe { (*s.face).box_vertical_line_width }, 0)
+            } else {
+                s.x
+            };
+
+            let y_start = s.y + (font.font.ascent + (s.height - font.font.height) / 2);
+
+            let offsets = s.composite_offsets();
+
+            let glyph_instances: Vec<GlyphInstance> = s
+                .composite_chars()
+                .into_iter()
+                .enumerate()
+                .filter_map(|(n, glyph)| {
+                    // TAB in a composition means display glyphs with padding
+                    // space on the left or right.
+                    if s.composite_glyph(n as usize) == <u8 as Into<i64>>::into(b'\t') {
+                        return None;
+                    }
+
+                    let xx = x + offsets[n as usize * 2] as i32;
+                    let yy = y_start - offsets[n as usize * 2 + 1] as i32;
+
+                    let glyph_instance = GlyphInstance {
+                        index: *glyph,
+                        point: LayoutPoint::new(xx as f32, yy as f32),
                     };
 
-                    let y_start = s.y + (font.font.ascent + (s.height - font.font.height) / 2);
+                    Some(glyph_instance)
+                })
+                .collect();
 
-                    let offsets = s.composite_offsets();
-
-                    s
-                        .composite_chars()
-                        .into_iter()
-                        .enumerate()
-                        .filter_map(|(n, glyph)| {
-                            // TAB in a composition means display glyphs with padding
-                            // space on the left or right.
-                            if s.composite_glyph(n as usize) == <u8 as Into<i64>>::into(b'\t') {
-                                return None;
-                            }
-
-                            let xx = x + offsets[n as usize * 2] as i32;
-                            let yy = y_start - offsets[n as usize * 2 + 1] as i32;
-
-                            let glyph_instance = GlyphInstance {
-                                index: *glyph,
-                                point: LayoutPoint::new(xx as f32, yy as f32),
-                            };
-
-                            Some(glyph_instance)
-                        })
-                        .collect()
-
-                } else {
-                    unimplemented!();
-                };
 
 
             let gc = s.gc;
