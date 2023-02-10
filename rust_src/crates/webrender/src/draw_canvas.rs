@@ -241,11 +241,6 @@ impl DrawCanvas {
 
         unsafe { get_glyph_string_clip_rect(s.as_mut(), &mut clip_rect) };
 
-        println!(
-            "Drawing image glyph {:?} of dimensions {:?}",
-            wr_pixmap, clip_rect
-        );
-
         let clip_bounds =
             (clip_rect.x, clip_rect.y).by(clip_rect.width as i32, clip_rect.height as i32);
         let bounds = (s.x, s.y).by(s.slice.width() as i32, s.slice.height() as i32);

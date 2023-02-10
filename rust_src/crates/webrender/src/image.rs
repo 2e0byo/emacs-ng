@@ -126,14 +126,12 @@ fn wand_convert(data: String) -> Result<Vec<u8>, MagickError> {
     let mut cache = WAND_CACHE.lock().unwrap();
     match cache.get(&data) {
         Some(&ref v) => {
-            println!("Cache hit");
             return Ok(v.clone());
         }
         None => {
             START.call_once(|| {
                 magick_wand_genesis();
             });
-            println!("Cache miss, data is: {:?}", data);
             let outf = new_fn(PathBuf::from("/tmp/imgs"), "xpm").unwrap();
             File::create(outf)
                 .ok()

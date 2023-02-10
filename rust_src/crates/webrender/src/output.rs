@@ -75,9 +75,7 @@ impl Output {
     pub fn build(event_loop: &mut WrEventLoop, frame: LispFrameRef) -> Self {
         // -- in glutin originally --
         let window_builder = WindowBuilder::new()
-            .with_visible(true)
-            .with_maximized(true)
-            .with_inner_size(LogicalSize::new(1920.0,1080.0));
+            .with_visible(true);
 
         #[cfg(all(feature = "wayland", not(any(target_os = "macos", windows))))]
         let window_builder = {
@@ -322,7 +320,7 @@ impl Output {
     }
 
     pub fn device_pixel_ratio(&self) -> f32 {
-            println!("Scale factor is: {:?}.  Global scale factor is 1.5.  Not sure where it got that.", self.get_window().scale_factor());
+            println!("Scale factor is: {:?}.", self.get_window().scale_factor());
         1.75 as f32
     }
 
@@ -508,7 +506,7 @@ impl Output {
     }
 
     pub fn resize(&mut self, size: &PhysicalSize<u32>) {
-        println!("In Output::resize()");
+        println!("Resizing to {:?}", size);
         let device_size = DeviceIntSize::new(size.width as i32, size.height as i32);
 
         let device_rect =
