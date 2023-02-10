@@ -299,6 +299,8 @@ pub fn winit_keycode_emacs_key_name(keycode: VirtualKeyCode) -> *const libc::c_c
         VirtualKeyCode::F23 => kn!("f23"),
         VirtualKeyCode::F24 => kn!("f24"),
 
+        VirtualKeyCode::Delete => kn!("deletechar"),
+
         _ => std::ptr::null(), // null pointer
     }
 }
