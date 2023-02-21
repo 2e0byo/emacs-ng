@@ -1,8 +1,11 @@
 use std::{
     ffi::CString,
-    io::{BufRead, Cursor, Seek},
+    fs::{create_dir_all, read_to_string, File},
+    io::{BufRead, Cursor, Seek, Write},
+    num::NonZeroUsize,
+    path::PathBuf,
     ptr,
-    sync::Arc,
+    sync::{Arc, Mutex, Once},
     time::Duration,
 };
 
@@ -12,12 +15,13 @@ use emacs::{
     frame::LispFrameRef,
     globals::{
         QCbackground, QCforeground, QCindex, Qcount, Qdelay, Qgif, Qjpeg, Qnative_image, Qnil,
-        Qpbm, Qpng, Qtiff,
+        Qpbm, Qpng, Qtiff, Qxpm,
     },
     lisp::LispObject,
 };
 use image::{
     codecs::gif::GifDecoder,
+    error::{ImageError, ImageFormatHint, UnsupportedError, UnsupportedErrorKind},
     imageops::FilterType,
     io::Reader,
     pnm::{PNMSubtype, PnmDecoder},
@@ -25,6 +29,10 @@ use image::{
 };
 use libc::c_void;
 use webrender::api::{ColorF, ColorU, ImageKey};
+
+use lazy_static::lazy_static;
+use lru::LruCache;
+use magick_rust::{magick_wand_genesis, MagickError, MagickWand};
 
 use crate::frame::LispFrameExt;
 
@@ -38,6 +46,8 @@ pub struct WrPixmap {
 pub fn can_use_native_image_api(image_type: LispObject) -> bool {
     match image_type {
         Qnative_image | Qpng | Qjpeg | Qgif | Qtiff | Qpbm => true,
+        #[cfg(feature = "magick")]
+        Qxpm => true,
         _ => false,
     }
 }
@@ -49,26 +59,114 @@ fn open_image(
     foreground_color: Rgba<u8>,
     background_color: Rgba<u8>,
 ) -> Option<(DynamicImage, Option<(usize, Duration)>)> {
-    if spec_file.is_string() {
-        let filename = spec_file.as_string().unwrap().to_string();
+    let loaded_image = {
+        if spec_file.is_string() {
+            let filename = spec_file.as_string().unwrap().to_string();
+            Reader::open(filename).ok().and_then(|r| {
+                decode_image_from_reader(r, frame_index, foreground_color, background_color).ok()
+            })
+        } else if spec_data.is_string() {
+            let data = spec_data.as_string().unwrap();
+            let reader = Reader::new(Cursor::new(data.as_slice()));
+            decode_image_from_reader(reader, frame_index, foreground_color, background_color).ok()
+        } else {
+            None
+        }
+    };
 
-        let loaded_image = Reader::open(filename).ok().and_then(|r| {
-            decode_image_from_reader(r, frame_index, foreground_color, background_color).ok()
-        });
+    let loaded_image = match loaded_image {
+        Some(loaded_image) => Some(loaded_image),
+        None => {
+            let data = match spec_data.is_string() {
+                true => spec_data.as_string().unwrap().to_utf8(),
+                false => read_to_string(spec_file.as_string().unwrap().to_string())
+                    .ok()
+                    .unwrap(),
+            };
+            let converted = convert(data, foreground_color, background_color);
+            match converted {
+                Ok(img) => Some((img, None)),
+                Err(e) => {
+                    log::warn!("Failed to convert image: {:?}", e);
+                    None
+                }
+            }
+        }
+    };
+    loaded_image
+}
 
-        return loaded_image;
+static START: Once = Once::new();
+
+fn new_fn(outdir: PathBuf, suffix: &str) -> std::io::Result<PathBuf> {
+    create_dir_all(outdir.clone())?;
+    let newf = (0..)
+        .map(|i| outdir.join(format!("img-{:04}.{}", i, suffix).to_string()))
+        .find(|f| !f.exists())
+        .unwrap();
+    Ok(newf)
+}
+
+lazy_static! {
+    static ref WAND_CACHE: Mutex<LruCache<String, Vec<u8>>> =
+        Mutex::new(LruCache::new(NonZeroUsize::new(20).unwrap()));
+}
+
+fn wand_convert(data: String) -> Result<Vec<u8>, MagickError> {
+    let mut cache = WAND_CACHE.lock().unwrap();
+    match cache.get(&data) {
+        Some(&ref v) => {
+            log::trace!("Cache hit for image.");
+            return Ok(v.clone());
+        }
+        None => {
+            log::trace!("Cache miss for image, converting with magic.");
+            START.call_once(|| {
+                magick_wand_genesis();
+            });
+            // temporarily save to outdir so we can see what's going on, particularly if it fails.
+            // TODO remove
+            let outf = new_fn(PathBuf::from("/tmp/imgs"), "xpm").unwrap();
+            File::create(outf)
+                .ok()
+                .unwrap()
+                .write_all(data.as_bytes())
+                .unwrap();
+            let wand = MagickWand::new();
+            // wand set background color?
+            // can we avoid the clone if we drop the cache result?  I think so.  But would have to drop the match block as well.
+            wand.read_image_blob(data.clone())?;
+            let v = wand.write_image_blob("jpeg")?;
+            cache.put(data, v.clone());
+            return Ok(v);
+        }
     }
+}
 
-    if spec_data.is_string() {
-        let data = spec_data.as_string().unwrap();
-
-        let reader = Reader::new(Cursor::new(data.as_slice()));
-        let loaded_image =
-            decode_image_from_reader(reader, frame_index, foreground_color, background_color).ok();
-        return loaded_image;
+fn convert(
+    data: String,
+    foreground_color: Rgba<u8>,
+    _background_color: Rgba<u8>,
+) -> ImageResult<DynamicImage> {
+    // TODO: some xpm images use predefined colors, which we don't have access to here.  Find out where this would normally by handled and pass it through.
+    // For now we just replace one of them.
+    let [r, g, b, _] = foreground_color.0;
+    let hex = format!("#{:X}{:X}{:X}", r, g, b);
+    let data = data.replace("opaque", &hex);
+    let png = wand_convert(data);
+    match png {
+        Err(e) => {
+            let format = ImageFormatHint::Unknown;
+            let kind = UnsupportedErrorKind::GenericFeature(e.to_string());
+            return Err(ImageError::Unsupported(
+                UnsupportedError::from_format_and_kind(format, kind),
+            ));
+        }
+        Ok(png) => {
+            let reader = Reader::new(Cursor::new(png)).with_guessed_format()?;
+            reader.decode()
+        }
     }
-
-    return None;
 }
 
 fn decode_gif_image_from_reader<R: BufRead + Seek>(

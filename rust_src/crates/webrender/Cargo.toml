@@ -34,6 +34,8 @@ tracing = "0.1"
 surfman = { version = "0.4.4", features = ["sm-raw-window-handle"], optional = true }
 glutin = { version = "0.30.6", optional = true }
 euclid = "0.22.7"
+magick_rust = { version = "0.17", optional = true }
+lru = { version = "0.9.0", optional = true }
 
 [dependencies.nix]
 version = "0.26"
@@ -65,7 +67,7 @@ gdkwayland-sys = { version = "0.16", optional = true }
 core-foundation = "0.9.2"
 
 [features]
-default = ["std", "winit", "surfman"]
+default = ["std", "winit", "glutin"]
 winit = ["dep:winit"]
 pgtk = ["dep:gtk", "dep:gtk-sys", "dep:gdk-sys", "dep:gdkwayland-sys"]
 capture=["webrender/capture", "webrender/serialize_program"]
@@ -80,3 +82,4 @@ std = [
 ]
 surfman = ["dep:surfman", "dep:webrender_surfman"]
 glutin = ["dep:glutin"]
+magick = ["dep:magick_rust", "dep:lru"]

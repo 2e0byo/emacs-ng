@@ -12221,7 +12221,7 @@ non-numeric, there is no explicit limit on the size of images.  */);
   add_image_type (Qxbm);
 
 #if defined (HAVE_XPM) || defined (HAVE_NS_IMAGE) \
-  || defined (HAVE_HAIKU) || defined (HAVE_PGTK_IMAGE)
+  || defined (HAVE_HAIKU) || defined (HAVE_PGTK_IMAGE) || defined (RUST_HAVE_IMAGEMAGICK)
   DEFSYM (Qxpm, "xpm");
   add_image_type (Qxpm);
 #endif

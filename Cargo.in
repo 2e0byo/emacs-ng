@@ -37,7 +37,7 @@ git = { version = "0.1.0", path = "rust_src/crates/git", optional = true }
 ng_module = { version = "0.1.0", path = "rust_src/crates/ng_module", optional = true }
 js = { version = "0.1.0", path = "rust_src/crates/js", optional = true }
 winit-term = { version = "0.1.0", path = "rust_src/crates/winit-term", optional = true }
-wr-renderer = { version = "0.1.0", path = "rust_src/crates/webrender", optional = true }
+wr-renderer = { version = "0.1.0", path = "rust_src/crates/webrender", optional = true, features= [ @CARGO_WEBRENDER_FEATURES@ ]}
 clippy = { version = "*", optional = true }
 log = "0.4.17"
 tracing = "0.1"
