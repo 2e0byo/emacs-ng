@@ -475,7 +475,7 @@ OPTION_DEFAULT_ON([libsystemd],[don't compile with libsystemd support])
 OPTION_DEFAULT_ON([cairo],[don't compile with Cairo drawing])
 OPTION_DEFAULT_ON([xml2],[don't compile with XML parsing support])
 OPTION_DEFAULT_OFF([libgit],[enable libgit2 and git2rs (experimental)])
-OPTION_DEFAULT_OFF([imagemagick],[compile with ImageMagick image support])
+OPTION_DEFAULT_ON([imagemagick],[compile with ImageMagick image support])
 OPTION_DEFAULT_ON([native-image-api], [don't use native image APIs (GDI+ on Windows)])
 OPTION_DEFAULT_IFAVAILABLE([json], [compile with native JSON support])
 OPTION_DEFAULT_IFAVAILABLE([tree-sitter], [compile with tree-sitter])
@@ -2948,8 +2948,9 @@ if test "${with_sqlite3}" != "no"; then
 fi
 
 HAVE_IMAGEMAGICK=no
+WEBRENDER_EXTRA_FEATURES=""
 if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${HAVE_W32}" = "yes" || \
-   test "${HAVE_BE_APP}" = "yes" || test "${window_system}" = "pgtk"; then
+   test "${HAVE_BE_APP}" = "yes" || test "${window_system}" = "pgtk" || test "${window_system}" = "winit"; then
   if test "${with_imagemagick}" != "no"; then
     if test -n "$BREW"; then
       # Homebrew doesn't link ImageMagick 6 by default, so make sure
@@ -2959,9 +2960,12 @@ if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${HAVE_W32}"
 
     EMACS_CHECK_MODULES([IMAGEMAGICK], [MagickWand >= 7])
     if test $HAVE_IMAGEMAGICK = yes; then
-       AC_DEFINE([HAVE_IMAGEMAGICK7], [1],
-	 [Define to 1 if using ImageMagick7.])
+         if test "${window_system}" != "winit"; then
+           AC_DEFINE([HAVE_IMAGEMAGICK7], [1],
+	   [Define to 1 if using ImageMagick7.])
+         fi
     else
+
        ## 6.3.5 is the earliest version known to work; see Bug#17339.
        ## 6.8.2 makes Emacs crash; see Bug#13867.
        EMACS_CHECK_MODULES([IMAGEMAGICK], [Wand >= 6.3.5 Wand != 6.8.2])
@@ -2984,7 +2988,12 @@ if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${HAVE_W32}"
       fi
     fi
     if test $HAVE_IMAGEMAGICK = yes; then
-      AC_DEFINE([HAVE_IMAGEMAGICK], [1], [Define to 1 if using ImageMagick.])
+      if test "${window_system}" != "winit"; then
+        AC_DEFINE([HAVE_IMAGEMAGICK], [1], [Define to 1 if using ImageMagick.])
+      else
+        AC_DEFINE([RUST_HAVE_IMAGEMAGICK], [1], [Define to 1 if rust needs ImageMagick.])
+        WEBRENDER_EXTRA_FEATURES="\"wrterm/magick\", ${WEBRENDER_EXTRA_FEATURES}"
+      fi
     else
       if test "${with_imagemagick}" != "no"; then
         AC_MSG_ERROR([ImageMagick wanted, but it does not compile.  Maybe some library files are missing?]);
@@ -7069,7 +7078,6 @@ fi || AC_MSG_ERROR(['src/epaths.h' could not be made.])
     window_system="$window_system" EN_NS_SELF_CONTAINED="$EN_NS_SELF_CONTAINED"])
 
 CARGO_DEFAULT_FEATURES=""
-WEBRENDER_EXTRA_FEATURES=""
 if test "$HAVE_LIBXML2" = "yes"; then
     CARGO_DEFAULT_FEATURES="${CARGO_DEFAULT_FEATURES}\"use-xml2\", "
 fi
